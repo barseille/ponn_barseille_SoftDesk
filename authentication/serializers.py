@@ -17,8 +17,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 class SignUpSerializer(serializers.ModelSerializer):
     """
-    Le serializer SignUpSerializer est utilisé pour créer une nouvelle 
-    instance de User en validant les données fournies par l'utilisateur.
+    Le serializer SignUpSerializer est utilisé pour valider les données fournies par l'utilisateur
+    et créer une nouvelle instance de User si les données sont valides.
     """
     
     # Deuxième mot de passe demandé pour confirmer le mot de passe lors de l'inscription.
@@ -41,6 +41,7 @@ class SignUpSerializer(serializers.ModelSerializer):
     def validate(self, data):
         """
         Vérifie si les deux mots de passe correspondent.
+        Si les mots de passe ne correspondent pas, une erreur est levée.
         """
         if data['password'] != data['password2']:
             raise serializers.ValidationError({"password": "Les deux mots de passe ne correspondent pas."})
@@ -48,7 +49,8 @@ class SignUpSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         """
-        Crée un nouvel utilisateur avec les données validées.
+        Crée un nouvel utilisateur avec les données validées (username, email, password).
+        **validated_data est une façon de passer toutes les données validées en une fois à la méthode create_user.
         """
         validated_data.pop('password2')
         user = User.objects.create_user(**validated_data)
@@ -65,8 +67,13 @@ class LoginSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         """
-        Vérifie si les informations d'identification sont valides.
+        Cette méthode va vérifier si les informations d'identification fournies
+        (username et password) sont correctes. Si c'est le cas, elle retourne les 
+        informations de l'utilisateur. Sinon, elle génère une exception de validation.
         """
+        
+        # Récupération de la valeur associée à la clé 'username' 
+        # et 'password' dans le dictionnaire attrs
         username = attrs.get('username')
         password = attrs.get('password')
 
@@ -74,11 +81,12 @@ class LoginSerializer(serializers.Serializer):
             user = authenticate(username=username, password=password)
 
             if not user:
-                raise serializers.ValidationError('Les informations d\'identification fournies ne permettent pas de se connecter.')
+                raise serializers.ValidationError("Les informations sont incorrectes.")
             if not user.is_active:
-                raise serializers.ValidationError('L\'utilisateur est inactif.')
+                raise serializers.ValidationError("L'utilisateur est inactif.")
         else:
-            raise serializers.ValidationError('Les champs "nom d\'utilisateur" et "mot de passe" sont nécessaires pour se connecter.')
+            raise serializers.ValidationError("Les champs nom d'utilisateur et mot de passe sont nécessaires pour se connecter")
 
+        # Ajout de la clé 'user' et sa valeur au dictionnaire attrs qui est l'objet utilisateur obtenu après authentification.
         attrs['user'] = user
         return attrs
