@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth import get_user_model
 
 
-
 class Project(models.Model):
     """
     Ce modèle représente un projet. Un projet a un auteur, un titre, une description, un type 
@@ -20,9 +19,8 @@ class Project(models.Model):
     description = models.TextField(max_length=2048)
     type = models.CharField(max_length=7, choices=PROJECT_TYPE_CHOICES)
     
-    # # Les utilisateurs qui contribuent au projet. C'est une relation many-to-many via le modèle Contributor.
+    # Modèle "Contributor" est un modèle intermédiaire, il représente la relation "contribuer à" entre l'utilisateur et projet.
     contributors = models.ManyToManyField(get_user_model(), through='Contributor', related_name='contributed_projects')
-
 
 
 class Contributor(models.Model):
@@ -35,7 +33,6 @@ class Contributor(models.Model):
     
     # Clé étrangère vers le modèle Project. Si le projet est supprimé, toutes les contributions à ce projet sont supprimées.
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='project_contributors')
-
 
 
 class Issue(models.Model):
@@ -73,7 +70,6 @@ class Issue(models.Model):
     
     # La date et l'heure de la création du prblème
     created_time = models.DateTimeField(auto_now_add=True)
-
 
 
 class Comment(models.Model):
