@@ -1,4 +1,4 @@
-from rest_framework import viewsets, generics
+from rest_framework import viewsets, generics, permissions
 from django.db.models import Q
 from django.contrib.auth import get_user_model
 from rest_framework.decorators import action
@@ -8,6 +8,8 @@ from django.shortcuts import get_object_or_404
 
 from .models import Project, Contributor, Issue, Comment
 from .serializers import ProjectSerializer, IssueSerializer, CommentSerializer, UserSerializer
+from .permissions import IsAuthor, IsContributor, IsIssueAuthor, IsCommentAuthor
+
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -17,9 +19,33 @@ class ProjectViewSet(viewsets.ModelViewSet):
     
     # Récupérer tous les projets
     queryset = Project.objects.all()
-    
-    # Utilisation du serializer au projet
     serializer_class = ProjectSerializer
+    
+    # Ajout des permissions
+    def get_permissions(self):
+        """
+        Surchargée pour attribuer des permissions spécifiques en fonction de l'action.
+        """
+
+        if self.action in ['create']:
+            # Tout le monde peut créer un projet
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            # Seul l'auteur peut lire, mettre à jour ou supprimer son projet
+            permission_classes = [IsAuthor]
+        elif self.action in ['retrieve', 'list']:
+            # L'auteur ou le contributeur peuvent lire ou lister
+            permission_classes = [IsAuthor | IsContributor]
+        elif self.action == 'add_contributor':
+            # Seul l'auteur peut ajouter un contributeur
+            permission_classes = [IsAuthor]
+        elif self.action == 'remove_contributor':
+            # Seul l'auteur peut retirer un contributeur
+            permission_classes = [IsAuthor]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         """
@@ -82,12 +108,14 @@ class ProjectViewSet(viewsets.ModelViewSet):
             
         except Contributor.DoesNotExist:
             
-            # Si le contributeur n'existe pas, renvoyer une erreur 404
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            # Si le contributeur n'existe pas, renvoyer une erreur 404 avec un message explicite
+            return Response({'error': 'Contributeur non trouvé'}, status=status.HTTP_404_NOT_FOUND)
 
         # Si le contributeur existe, le supprimer
         contributor.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        
+        # Renvoyer un message de succès pour indiquer que le contributeur a été correctement supprimé
+        return Response({'message': 'Contributeur supprimé avec succès'}, status=status.HTTP_204_NO_CONTENT)
 
 
 
@@ -99,6 +127,23 @@ class IssueViewSet(viewsets.ModelViewSet):
     # Récupérer tous les problèmes
     queryset = Issue.objects.all()
     serializer_class = IssueSerializer
+    
+    # Ajout des permissions
+    def get_permissions(self):
+        """
+        Surchargée pour attribuer des permissions spécifiques en fonction de l'action.
+        """
+
+        if self.action in ['list', 'create']:
+            # Tout le monde peut lister les problèmes ou en créer un
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            # Seul l'auteur peut lire, mettre à jour ou supprimer son problème
+            permission_classes = [IsIssueAuthor]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         """
@@ -118,6 +163,9 @@ class IssueViewSet(viewsets.ModelViewSet):
         
         # Récupérer l'ID du projet
         project_id = self.kwargs['project_pk']
+        if not project_id:
+            return Response({"detail": "La clé project_pk est requis."}, status=status.HTTP_400_BAD_REQUEST)
+
         
         # Trouver le projet correspondant
         project = get_object_or_404(Project, pk=project_id)
@@ -134,6 +182,24 @@ class CommentViewSet(viewsets.ModelViewSet):
     # Récupérer tous les commentaires
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
+    
+    # Ajout des permissions
+    def get_permissions(self):
+        """
+        Surchargée pour attribuer des permissions spécifiques en fonction de l'action.
+        """
+
+        if self.action in ['list', 'create']:
+            # Tout le monde peut lister les commentaires ou en créer un
+            permission_classes = [permissions.IsAuthenticated]
+        elif self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            # Seul l'auteur peut lire, mettre à jour ou supprimer son commentaire
+            permission_classes = [IsCommentAuthor]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+
+        return [permission() for permission in permission_classes]
+
 
     def get_queryset(self):
         """
@@ -146,6 +212,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         # Renvoyer les commentaires où l'utilisateur est l'auteur ou contributeur
         return Comment.objects.filter(Q(issue__project__author=user) | Q(issue__project__contributors=user))
 
+
     def perform_create(self, serializer):
         """
         Surchargée pour ajouter l'auteur et l'issue lors de la création d'un commentaire.
@@ -153,6 +220,9 @@ class CommentViewSet(viewsets.ModelViewSet):
         
         # Récupérer l'ID de l'issue
         issue_id = self.kwargs['issue_pk']
+        if not issue_id:
+            return Response({"detail": "La clé issue_pk est requis."}, status=status.HTTP_400_BAD_REQUEST)
+
         
         # Trouver l'issue correspondante
         issue = get_object_or_404(Issue, pk=issue_id)
