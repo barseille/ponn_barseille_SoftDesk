@@ -1,4 +1,5 @@
 from rest_framework import permissions
+from rest_framework.exceptions import PermissionDenied
 
 class IsAuthor(permissions.BasePermission):
     """
@@ -6,8 +7,10 @@ class IsAuthor(permissions.BasePermission):
     """
     
     def has_object_permission(self, request, view, obj):
-        return obj.author == request.user
-    
+        if request.user == obj.author:
+            return True
+        else:
+            raise PermissionDenied("Vous n'êtes pas autorisé, vous n'êtes pas l'auteur de ce projet")
     
 class IsContributor(permissions.BasePermission):
     """
@@ -15,7 +18,8 @@ class IsContributor(permissions.BasePermission):
     """
     
     def has_object_permission(self, request, view, obj):
-        return request.user in obj.contributors.all()
+        return obj.contributors.filter(user=request.user).exists()
+
 
     
 class IsIssueAuthor(permissions.BasePermission):

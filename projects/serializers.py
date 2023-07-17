@@ -22,36 +22,8 @@ class ContributorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contributor
         fields = ['id', 'user', 'project']  
-
-
-class ProjectSerializer(serializers.ModelSerializer):
-    """
-    Ce sérialiseur est utilisé pour convertir les objets Project en format JSON.
-    """
-    
-    # Pour le champ 'contributors', utilise un champ lié à la clé primaire.
-    contributors = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
-
-    class Meta:
-        model = Project
-        fields = ['id', 'title', 'description', 'type', 'author', 'contributors']  
-
-
-class IssueSerializer(serializers.ModelSerializer):
-    """
-    Ce sérialiseur est utilisé pour convertir les objets Issue en format JSON.
-    """
-    
-    author = UserSerializer(read_only=True)
-    
-    # Utilise un champ lié à la clé primaire pour le champ 'project'.
-    project = serializers.PrimaryKeyRelatedField(read_only=True)
-
-    class Meta:
-        model = Issue
-        fields = ['id', 'title', 'description', 'priority', 'tag', 'status', 'project', 'author', 'created_time']
-
-
+   
+   
 class CommentSerializer(serializers.ModelSerializer):
     """
     Ce sérialiseur est utilisé pour convertir les objets Comment en format JSON.
@@ -64,4 +36,48 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ['id', 'description', 'author', 'issue', 'created_time']
+        fields = ['id', 'description', 'author', 'issue', 'created_time']     
+        
+class IssueSerializer(serializers.ModelSerializer):
+    """
+    Ce sérialiseur est utilisé pour convertir les objets Issue en format JSON.
+    """
+    
+    author = UserSerializer(read_only=True)
+    comments = CommentSerializer(many=True, read_only=True)
+    
+    # Utilise un champ lié à la clé primaire pour le champ 'project'.
+    project = serializers.PrimaryKeyRelatedField(read_only=True)
+
+    class Meta:
+        model = Issue
+        fields = ['id', 'title', 'description', 'priority', 'tag', 'status', 'project', 'author', 'created_time', 'comments']
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    """
+    Ce sérialiseur est utilisé pour convertir les objets Project en format JSON.
+    """
+    
+    # Pour le champ 'contributors', utilise un champ lié à la clé primaire.
+    contributors = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    # issues = IssueSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Project
+        fields = ['id', 'title', 'description', 'type', 'author', 'contributors']  
+
+
+class ProjectDetailSerializer(ProjectSerializer):
+    """
+    Ce sérialiseur est utilisé pour convertir les objets Project en détails en format JSON.
+    """
+    
+    issues = IssueSerializer(many=True, read_only=True)
+    comments = CommentSerializer(many=True, read_only=True)
+
+    class Meta(ProjectSerializer.Meta):
+        fields = ProjectSerializer.Meta.fields + ['issues', 'comments']
+
+
+
