@@ -6,10 +6,13 @@ from .serializers import ProjectSerializer, IssueSerializer, CommentSerializer, 
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from django.contrib.auth import get_user_model
+from rest_framework.permissions import IsAuthenticated
+from django.http import Http404
+from django.core.exceptions import PermissionDenied
 
 from .models import Project, Contributor, Issue, Comment
 from .serializers import ProjectSerializer, IssueSerializer, CommentSerializer, UserSerializer, ProjectDetailSerializer
-from .permissions import IsAuthor
+from .permissions import IsAuthor, IsContributor, IsIssueAuthor, IsAuthorOrContributor, IsCommentAuthor, IsIssueAuthorOrContributor
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -89,7 +92,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             Contributor.objects.create(user=contributor_user, project=project)
 
         except get_user_model().DoesNotExist:
-            return Response({'message': "L'utilisateur que vous voulez ajouter en tant que contributeur n'existe pas."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': "Le contributeur n'existe pas."}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response({'message': 'Contributeur ajouté avec succès au projet.'}, status=status.HTTP_201_CREATED)
 
@@ -125,6 +128,9 @@ class IssueViewSet(viewsets.ModelViewSet):
     # Récupérer tous les problèmes
     queryset = Issue.objects.all()
     serializer_class = IssueSerializer
+    
+    # Les permissions sont définies par défaut comme IsAuthenticated
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         """
@@ -150,6 +156,30 @@ class IssueViewSet(viewsets.ModelViewSet):
 
         # Enregistrer la nouvelle issue
         serializer.save(author=self.request.user, project=project)
+    
+    
+    def get_permissions(self):
+        """
+        Instancie et renvoie la liste des autorisations que cette vue nécessite.
+        """
+        try:
+            if self.action in ['update', 'partial_update', 'destroy']:
+                permission_classes = [IsIssueAuthor]
+            elif self.action == 'create':
+                project = get_object_or_404(Project, pk=self.kwargs['project_pk'])
+                if IsAuthorOrContributor().has_object_permission(self.request, None, project):
+                    permission_classes = [permissions.AllowAny]
+                else:
+                    raise PermissionDenied("Vous n'êtes pas autorisé à créer un problème pour ce projet")
+            else:
+                permission_classes = [IsAuthorOrContributor]
+        except Http404:
+            raise Http404("Le projet demandé n'existe pas.")
+
+        return [permission() for permission in permission_classes]
+
+
+
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -185,6 +215,24 @@ class CommentViewSet(viewsets.ModelViewSet):
 
         # Enregistrer le nouveau commentaire
         serializer.save(author=self.request.user, issue=issue)
+        
+    def get_permissions(self):
+        """
+        Instancie et renvoie la liste des autorisations que cette vue nécessite.
+        """
+        if self.action in ['update', 'partial_update', 'destroy']:
+            permission_classes = [IsCommentAuthor]
+        elif self.action == 'create':
+            issue = get_object_or_404(Issue, pk=self.kwargs['issue_pk'])
+            if IsIssueAuthorOrContributor().has_object_permission(self.request, None, issue):
+                permission_classes = [permissions.AllowAny]
+            else:
+                raise PermissionDenied("Vous n'êtes pas autorisé à créer un commentaire pour ce problème")
+        else:
+            permission_classes = [IsIssueAuthorOrContributor]
+
+        return [permission() for permission in permission_classes]
+
 
 
 class UserListView(generics.ListAPIView):
