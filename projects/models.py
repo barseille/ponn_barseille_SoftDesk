@@ -21,7 +21,7 @@ class Project(models.Model):
     
     # Modèle "Contributor" est un modèle intermédiaire, il représente la relation "contribuer à" entre l'utilisateur et projet.
     contributors = models.ManyToManyField(get_user_model(), through='Contributor', related_name='contributed_projects')
-
+    
 
 class Contributor(models.Model):
     """

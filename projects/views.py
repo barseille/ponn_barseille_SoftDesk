@@ -60,6 +60,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             return ProjectDetailSerializer
         return self.serializer_class
 
+
     def get_permissions(self):
         """
         Surcharge de la méthode `get_permissions`
@@ -68,6 +69,22 @@ class ProjectViewSet(viewsets.ModelViewSet):
         if self.action in ['update', 'partial_update', 'destroy', 'add_contributor', 'remove_contributor']:
             self.permission_classes = [IsAuthor]
         return super(ProjectViewSet, self).get_permissions()
+ 
+    
+    @action(detail=True, methods=['get'], url_path='users')
+    def get_contributors(self, request, *args, **kwargs):
+        """
+        Renvoie la liste des contributeurs pour un projet spécifique.
+        """
+        # Récupérer le projet actuel
+        project = self.get_object()
+        # Récupérer les contributeurs du projet
+        contributors = project.contributors.all()
+
+        # Serializer les données
+        serializer = UserSerializer(contributors, many=True)
+        
+        return Response(serializer.data)
 
 
     @action(detail=True, methods=['post'], url_path='users')
@@ -243,3 +260,5 @@ class UserListView(generics.ListAPIView):
     # Récupérer tous les utilisateurs
     queryset = get_user_model().objects.all()
     serializer_class = UserSerializer
+
+

@@ -61,7 +61,7 @@ class ProjectSerializer(serializers.ModelSerializer):
     
     # Pour le champ 'contributors', utilise un champ lié à la clé primaire.
     contributors = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
-    # issues = IssueSerializer(many=True, read_only=True)
+
 
     class Meta:
         model = Project
@@ -78,6 +78,3 @@ class ProjectDetailSerializer(ProjectSerializer):
 
     class Meta(ProjectSerializer.Meta):
         fields = ProjectSerializer.Meta.fields + ['issues', 'comments']
-
-
-
