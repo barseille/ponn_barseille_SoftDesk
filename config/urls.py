@@ -5,7 +5,7 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_nested import routers
 
-from projects.views import ProjectViewSet, IssueViewSet, CommentViewSet, UserListView
+from projects.views import ProjectViewSet, IssueViewSet, CommentViewSet, UserListView, ProjectUserViewSet
 
 
 
@@ -20,16 +20,25 @@ router.register("signup", SignUpView, basename="signup")
 # La vue ProjectViewSet sera accessible via l'URL /projects
 router.register('projects', ProjectViewSet, basename='projects')
 
+
+
 # Nous créons un routeur imbriqué pour gérer les issues associées à un projet
 # On créé un routeur imbriqué pour gérer les issues associées à un projet
 # Cela nous permettra d'accéder aux issues d'un projet via l'URL /projects/{project_id}/issues
 project_router = routers.NestedSimpleRouter(router, 'projects', lookup='project')
 project_router.register('issues', IssueViewSet, basename='project-issues')
 
+project_router.register('user_list', ProjectUserViewSet, basename='project-user_list')
+
+
+
 # Nous créons un autre routeur imbriqué pour gérer les commentaires associés à une issue
 # Cela nous permettra d'accéder aux commentaires d'une issue via l'URL /projects/{project_id}/issues/{issue_id}/comments
 issue_router = routers.NestedSimpleRouter(project_router, 'issues', lookup='issue')
 issue_router.register('comments', CommentViewSet, basename='issue-comments')
+
+# project_router.register('users', ProjectUserViewSet, basename='project-users')
+
 
 # # On définit les routes de notre application
 urlpatterns = [

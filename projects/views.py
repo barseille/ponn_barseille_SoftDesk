@@ -9,10 +9,11 @@ from django.contrib.auth import get_user_model
 from rest_framework.permissions import IsAuthenticated
 from django.http import Http404
 from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseForbidden
 
 from .models import Project, Contributor, Issue, Comment
 from .serializers import ProjectSerializer, IssueSerializer, CommentSerializer, UserSerializer, ProjectDetailSerializer
-from .permissions import IsAuthor, IsContributor, IsIssueAuthor, IsAuthorOrContributor, IsCommentAuthor, IsIssueAuthorOrContributor
+from .permissions import IsAuthor, IsIssueAuthor, IsAuthorOrContributor, IsCommentAuthor, IsIssueAuthorOrContributor
 
 
 class ProjectViewSet(viewsets.ModelViewSet):
@@ -20,41 +21,32 @@ class ProjectViewSet(viewsets.ModelViewSet):
     Un ViewSet pour la vue de l'API des objets 'Project'.
     """
 
-    # Récupérer tous les projets
     queryset = Project.objects.all()
-
-    # Utilisation du serializer au projet
     serializer_class = ProjectSerializer
-    
-    # Les permissions sont définies par défaut comme IsAuthenticated
     permission_classes = [permissions.IsAuthenticated]
+
 
     def get_queryset(self):
         """
-        Cette méthode est surchargée pour personnaliser la queryset 
-        en fonction de l'utilisateur qui fait la requête.
+        Personnalise la queryset pour renvoyer seulement les projets où 
+        l'utilisateur connecté est l'auteur ou un contributeur.
         """
+        user = self.request.user     
+        return Project.objects.filter(Q(author=user) | Q(contributors=user)).distinct()
 
-        # Récupérer l'utilisateur actuellement connecté
-        user = self.request.user
-        
-        # Récupérer seulement les projets où l'utilisateur est l'auteur ou un des contributeurs
-        return Project.objects.filter(Q(author=user) | Q(contributors=user))
 
 
     def perform_create(self, serializer):
         """
-        Surchargée pour ajouter l'auteur lors de la création d'un projet.
+        On définit l'utilisateur connecté comme auteur lors de la création d'un projet.
         """
-
-        # Définir l'auteur du projet lors de sa création
         serializer.save(author=self.request.user)
 
 
     def get_serializer_class(self):
         """
-        Surcharge de la méthode `get_serializer_class` 
-        pour utiliser un serializer différent pour la méthode `retrieve`.
+        Retourne les détails d'un projet pour l'action 'retrieve', 
+        sinon le serializer par défaut.
         """
         if self.action == 'retrieve':
             return ProjectDetailSerializer
@@ -70,21 +62,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
             self.permission_classes = [IsAuthor]
         return super(ProjectViewSet, self).get_permissions()
  
-    
-    @action(detail=True, methods=['get'], url_path='users')
-    def get_contributors(self, request, *args, **kwargs):
-        """
-        Renvoie la liste des contributeurs pour un projet spécifique.
-        """
-        # Récupérer le projet actuel
-        project = self.get_object()
-        # Récupérer les contributeurs du projet
-        contributors = project.contributors.all()
-
-        # Serializer les données
-        serializer = UserSerializer(contributors, many=True)
-        
-        return Response(serializer.data)
 
 
     @action(detail=True, methods=['post'], url_path='users')
@@ -96,6 +73,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         # Récupérer le projet actuel
         project = self.get_object()
 
+        # Essaie de récupérer l'utilisateur avec l'ID contributor_id
         try:
             # Récupérer l'utilisateur qui doit être ajouté en tant que contributeur
             contributor_user = get_user_model().objects.get(id=request.data.get('contributor_id'))
@@ -108,6 +86,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             # Si non, créer un nouvel enregistrement dans la table des contributeurs
             Contributor.objects.create(user=contributor_user, project=project)
 
+        
         except get_user_model().DoesNotExist:
             return Response({'message': "Le contributeur n'existe pas."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -116,7 +95,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     
     
     
-    @action(detail=True, methods=['delete'], url_path='users/(?P<contributor_id>[^/.]+)')
+    @action(detail=True, methods=['delete'], url_path='users/(?P<contributor_id>\d+)')
     def remove_contributor(self, request, pk=None, contributor_id=None):
         """
         Méthode personnalisée pour supprimer un contributeur d'un projet.
@@ -135,7 +114,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
         return Response({'message': 'Contributeur supprimé avec succès du projet.'}, status=status.HTTP_204_NO_CONTENT)
 
-
+ 
 
 class IssueViewSet(viewsets.ModelViewSet):
     """
@@ -260,5 +239,23 @@ class UserListView(generics.ListAPIView):
     # Récupérer tous les utilisateurs
     queryset = get_user_model().objects.all()
     serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 
+
+class ProjectUserViewSet(viewsets.ViewSet):
+    """
+    ViewSet pour obtenir les utilisateurs liés à un projet spécifique.
+    """
+    # Définition de la classe de permissions
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request, project_pk=None):
+        project = get_object_or_404(Project, pk=project_pk)
+
+        # Vérifiez si l'utilisateur est l'auteur du projet ou un contributeur
+        if not project.author == request.user and not project.contributors.filter(id=request.user.id).exists():
+            return HttpResponseForbidden("Vous n'avez pas la permission d'accéder à cette ressource.")
+
+        serializer = UserSerializer(project.contributors, many=True)
+        return Response(serializer.data)
