@@ -33,7 +33,7 @@ class SignUpView(viewsets.ModelViewSet):
         # Vérifie si les données sont valides
         if serializer.is_valid(raise_exception=True):
             
-            # # Enregistre l'utilisateur
+            # Enregistre l'utilisateur
             user = serializer.save()
 
             # Crée un nouveau token de rafraîchissement pour l'utilisateur

@@ -1,12 +1,11 @@
 from authentication.views import SignUpView, LoginView
+from django.contrib import admin
 
 from django.urls import path, include
-# from rest_framework import routers
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_nested import routers
 
 from projects.views import ProjectViewSet, IssueViewSet, CommentViewSet, UserListView, ProjectUserViewSet
-
 
 
 # On crée une instance de DefaultRouter
@@ -21,15 +20,14 @@ router.register("signup", SignUpView, basename="signup")
 router.register('projects', ProjectViewSet, basename='projects')
 
 
-
-# Nous créons un routeur imbriqué pour gérer les issues associées à un projet
 # On créé un routeur imbriqué pour gérer les issues associées à un projet
 # Cela nous permettra d'accéder aux issues d'un projet via l'URL /projects/{project_id}/issues
 project_router = routers.NestedSimpleRouter(router, 'projects', lookup='project')
 project_router.register('issues', IssueViewSet, basename='project-issues')
 
+# On enregistre une vue imbriquée pour lister les utilisateurs d'un projet spécifique.
+# Cela nous permettra d'accéder à la liste des utilisateurs d'un projet via l'URL /projects/{project_id}/user_list
 project_router.register('user_list', ProjectUserViewSet, basename='project-user_list')
-
 
 
 # Nous créons un autre routeur imbriqué pour gérer les commentaires associés à une issue
@@ -37,12 +35,10 @@ project_router.register('user_list', ProjectUserViewSet, basename='project-user_
 issue_router = routers.NestedSimpleRouter(project_router, 'issues', lookup='issue')
 issue_router.register('comments', CommentViewSet, basename='issue-comments')
 
-# project_router.register('users', ProjectUserViewSet, basename='project-users')
 
-
-# # On définit les routes de notre application
+#  On définit les routes de notre application
 urlpatterns = [
-    
+    path('admin/', admin.site.urls),
     # activer l’authentification fournie par DRF pour se connecter
     path('api-auth/', include('rest_framework.urls')),
 
@@ -71,7 +67,7 @@ urlpatterns = [
     path('', include(issue_router.urls)),
 
     # Route pour lister tous les utilisateurs authentifiés
-    # La vue UserListView sera accessible via l'URL /users
+    # La vue UserListView sera accessible via l'URL /users_list
     path('users/', UserListView.as_view(), name='user_list'),
 ]
 

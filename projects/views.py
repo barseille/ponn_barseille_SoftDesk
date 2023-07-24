@@ -32,6 +32,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
         l'utilisateur connecté est l'auteur ou un contributeur.
         """
         user = self.request.user     
+        
+        # fonction distinct : éviter les doublons si un utilisateur est à la fois auteur et contributeur d'un projet.
         return Project.objects.filter(Q(author=user) | Q(contributors=user)).distinct()
 
 
